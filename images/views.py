@@ -49,6 +49,8 @@ def image_detail(request, id, slug):
     image = get_object_or_404(Image, id=id, slug=slug)
     # Increment total image views by 1
     total_views = r.incr(f'image:{image.id}:views')
+    # Increment image ranking by 1
+    r.zincrby('image_ranking', 1, image.id)
     return render(request, 'images/image/detail.html',
                   {'section': 'images', 'image': image, 'total_views': total_views})
 
@@ -94,3 +96,18 @@ def image_list(request):
                       {'section': 'images', 'images': images})
     return render(request, 'images/image/list.html',
                   {'section': 'images', 'images': images})
+
+
+@login_required
+def image_ranking(request):
+    # Get image ranking dictionary
+    img_ranking = r.zrange('image_ranking', 0, -1, desc=True)[:10]
+    img_ranking_ids = [int(img_id) for img_id in img_ranking]
+    # Get most viewed images
+    most_viewed = list(Image.objects.filter(
+        id__in=img_ranking_ids))
+    most_viewed.sort(key=lambda x: img_ranking_ids.index(x.id))
+    return render(request,
+                  'images/image/ranking.html',
+                  {'section': 'images',
+                   'most_viewed': most_viewed})
